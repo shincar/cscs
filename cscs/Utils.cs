@@ -262,6 +262,20 @@ namespace SplitAndMerge
             }
         }
 
+        public static byte[] GetFileBytes(string filename)
+        {
+          try
+          {
+              byte[] bytes = File.ReadAllBytes(filename);
+              return bytes;
+          }
+          catch (Exception ex)
+          {
+            throw new ArgumentException("Couldn't read file bytes [" + filename +
+                                            "] from disk: " + ex.Message);
+          }
+        }
+
         public static string[] GetFileLines(string filename, int from, int count)
         {
             try

@@ -322,6 +322,19 @@ namespace SplitAndMerge
         }
     }
 
+    class ReadCSCSFileBytesFunction : ParserFunction, IArrayFunction
+    {
+        protected override Variable Evaluate(ParsingScript script)
+        {
+          string filename = Utils.GetItem(script).AsString();
+          byte[] bytes = Utils.GetFileBytes(filename);
+
+          List<Variable> results = Utils.ConvertToResults(bytes);
+          Interpreter.Instance.AppendOutput("Read " + bytes.Length + " byte(s).", true);
+
+          return new Variable(results);
+        }
+    }
 
     // View the contents of a text file
     class MoreFunction : ParserFunction, IArrayFunction

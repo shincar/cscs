@@ -36,6 +36,7 @@ namespace SplitAndMerge
         public const string PWD = "pwd";
         public const string READ = "read";
         public const string READFILE = "readfile";
+        public const string READFILEBYTES = "readfilebytes";
         public const string READNUMBER = "readnum";
         public const string RUN = "run";
         public const string SET_NATIVE = "SetNative";

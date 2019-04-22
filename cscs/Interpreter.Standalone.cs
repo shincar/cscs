@@ -34,6 +34,7 @@ namespace SplitAndMerge
             ParserFunction.RegisterFunction(Constants.PSINFO, new PsInfoFunction());
             ParserFunction.RegisterFunction(Constants.PWD, new PwdFunction());
             ParserFunction.RegisterFunction(Constants.READFILE, new ReadCSCSFileFunction());
+            ParserFunction.RegisterFunction(Constants.READFILEBYTES, new ReadCSCSFileBytesFunction());
             ParserFunction.RegisterFunction(Constants.RUN, new RunFunction());
             ParserFunction.RegisterFunction(Constants.SET_NATIVE, new SetNativeFunction());
             ParserFunction.RegisterFunction(Constants.STARTSRV, new ServerSocket());

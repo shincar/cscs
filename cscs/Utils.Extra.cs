@@ -314,6 +314,17 @@ namespace SplitAndMerge
             return results;
         }
 
+        public static List<Variable> ConvertToResults(byte[] bytes)
+        {
+            List<Variable> results = new List<Variable>(bytes.Length);
+            foreach (byte item in bytes)
+            {
+              results.Add(new Variable(item));
+            }
+
+            return results;
+        }
+
         private static void WriteBlinkingText(string text, int delay, bool visible)
         {
             if (visible)
