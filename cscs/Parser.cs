@@ -616,6 +616,12 @@ namespace SplitAndMerge
                         leftCell.Value += rightCell.Value;
                     }
                     break;
+                case "<<":
+                    leftCell.Value = (int)leftCell.Value << (int)rightCell.Value;
+                    break;
+                case ">>":
+                  leftCell.Value = (int)leftCell.Value >> (int)rightCell.Value;
+                  break;
                 case "-":
                     leftCell.Value -= rightCell.Value;
                     break;
@@ -708,6 +714,8 @@ namespace SplitAndMerge
             {
                 case "++":
                 case "--": return 11;
+                case "<<":
+                case ">>":
                 case "%":
                 case "*":
                 case "/": return 10;

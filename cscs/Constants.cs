@@ -42,6 +42,8 @@ namespace SplitAndMerge
         public const string SUBT_ASSIGN = "-=";
         public const string MULT_ASSIGN = "*=";
         public const string DIV_ASSIGN = "/=";
+        public const string LEFTSHIFT = "<<";
+        public const string RIGHTSHIFT = ">>";
 
         public const string BREAK = "break";
         public const string CATCH = "catch";
@@ -163,9 +165,9 @@ namespace SplitAndMerge
         public static string END_ARG_STR = END_ARG.ToString();
         public static string NULL_ACTION = END_ARG.ToString();
 
-        public static string[] OPER_ACTIONS = { "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=" };
+        public static string[] OPER_ACTIONS = { "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^="};
         public static string[] MATH_ACTIONS = { "&&", "||", "==", "!=", "<=", ">=", "++", "--",
-                                            "%", "*", "/", "+", "-", "^", "&", "|", "<", ">", "="};
+                                            "<<", ">>", "%", "*", "/", "+", "-", "^", "&", "|", "<", ">", "="};
         // Actions: always decreasing by the number of characters.
         public static string[] ACTIONS = (OPER_ACTIONS.Union(MATH_ACTIONS)).ToArray();
 
