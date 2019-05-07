@@ -110,6 +110,8 @@ namespace SplitAndMerge
             ParserFunction.RegisterFunction(Constants.GET_KEYS, new GetAllKeysFunction());
             ParserFunction.RegisterFunction(Constants.LOCK, new LockFunction());
             ParserFunction.RegisterFunction(Constants.LOG, new LogFunction());
+            ParserFunction.RegisterFunction(Constants.NAMESPACE, new NamespaceFunction());
+            ParserFunction.RegisterFunction(Constants.NAME_EXISTS, new NameExistsFunction());
             ParserFunction.RegisterFunction(Constants.NOW, new DateTimeFunction());
             ParserFunction.RegisterFunction(Constants.PI, new PiFunction());
             ParserFunction.RegisterFunction(Constants.POW, new PowFunction());
@@ -153,6 +155,7 @@ namespace SplitAndMerge
             ParserFunction.RegisterFunction(Constants.TO_INT, new ToIntFunction());
             ParserFunction.RegisterFunction(Constants.TO_STRING, new ToStringFunction());
             ParserFunction.RegisterFunction(Constants.WAIT, new SignalWaitFunction(false));
+            ParserFunction.RegisterFunction(Constants.WEB_REQUEST, new WebRequestFunction());
 
             ParserFunction.RegisterEnum(Constants.VARIABLE_TYPE, "SplitAndMerge.Variable.VarType");
 
@@ -292,7 +295,8 @@ namespace SplitAndMerge
             forScript.ParentScript = script;
             forScript.Filename = script.Filename;
             forScript.Debugger = script.Debugger;
-            Variable arrayValue = forScript.ExecuteFrom(index + 1);
+            forScript.Pointer = index + 1;
+            Variable arrayValue = Utils.GetItem(forScript);
 
             int cycles = arrayValue.Count;
             if (cycles == 0)
@@ -334,7 +338,8 @@ namespace SplitAndMerge
             forScript.ParentScript = script;
             forScript.Filename = script.Filename;
             forScript.Debugger = script.Debugger;
-            Variable arrayValue = await forScript.ExecuteFromAsync(index + 1);
+            forScript.Pointer = index + 1;
+            Variable arrayValue = await Utils.GetItemAsync(forScript);
 
             int cycles = arrayValue.Count;
             if (cycles == 0)

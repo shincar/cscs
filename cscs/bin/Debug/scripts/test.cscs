@@ -471,16 +471,6 @@ Print("factorial(", n, ")=", f);
 variableTest();
 Print("After function, n=", n);
 
-слова = {"Это", "написано", "по-русски"};
-размер = size(слова);
-и = 0;
-while(и < размер) {
-  if (и  % 2 == 0) {
-    Print(слова[и]);
-  }
-  и++;
-}
-
 for (i = 10; i >= 0; i--) {
   Print(i, " ");
   arr[i] = 2*i;
@@ -756,13 +746,16 @@ class Stuff2 {
 
 class CoolStuff : Stuff1, Stuff2 {
   z = 3;
-  CoolStuff(a, b, c) {
+  CoolStuff(a=1, b=2, c=3) {
     x = a;
     y = b;
     z = c;
   } 
   function addCoolStuff() {
     return x + addStuff2(z);
+  }
+  function ToString() {
+    return "{" + x + "," + y + "," + z + "}";
   }
 }
 
@@ -782,6 +775,19 @@ Test(newObj.z, 17);
 Test(newObj.addCoolStuff(), 41);
 Test(newObj.addStuff1(addition), 111);
 Test(newObj.addStuff2(addition), 113);
+
+obj1 = new CoolStuff();
+obj2 = new CoolStuff(10);
+obj3 = new CoolStuff(10, 20);
+obj4 = new CoolStuff(10, 20, 30);
+
+for( x : {obj1, obj2, obj3, obj4}) {
+  print( x );
+}
+Test(obj1.ToString(), "{1,2,3}");
+Test(obj2.ToString(), "{10,2,3}");
+Test(obj3.ToString(), "{10,20,3}");
+Test(obj4.ToString(), "{10,20,30}");
 
 Print("Testing Dot Notation");
 numVar = 1234.56;
@@ -813,7 +819,7 @@ Test(strVar.Replace(strVar, strVar.lower), strVar.lower);
 Test(strVar.At(strVar.size-1), "!");
 
 testStr = "Let's tokenize this.";
-tokens = testStr.tokenize();
+tokens = testStr.split();
 Test(tokens.first, "Let's");
 Test(tokens.last, "this.");
 Test(tokens.size, 3);
@@ -897,6 +903,28 @@ Test(existingEnum.None, 0);
 Test(existingEnum.Object > 0, true);
 Test(newlyDefined.Vertical > newlyDefined.Horizontal, true);
 Test(newlyDefined.Orthogonal, 3);
+
+Print("Testing Misc. Functions...");
+Test(NameExists(IamABrandNewName), false);
+Test(NameExists(arr), true);
+
+for (i = 0; i < 2; i++) {
+  if( !NameExists( MyNewFunction )) {
+    function MyNewFunction(object) { 
+      print( "MyNewFunction");
+    };
+    print( "Just defined MyNewFunction");
+    Test(i, 0);
+  } else {
+    print( "MyNewFunction Exists" );
+    Test(i >= 0, true);
+  }
+}
+
+strArray = {"z3", "b2", "a1"};
+numArray = {51, 39, 33};
+Test(strArray.Sort(), {"a1", "b2", "z3"});
+Test(numArray.Sort(), {33, 39, 51});
 
 Timeout = 100;
 MySender = "Tester";

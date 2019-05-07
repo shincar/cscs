@@ -94,6 +94,8 @@ namespace SplitAndMerge
         public const string HELP = "help";
         public const string LOCK = "lock";
         public const string LOG = "log";
+        public const string NAME_EXISTS = "NameExists";
+        public const string NAMESPACE = "Namespace";
         public const string NOW = "Now";
         public const string OBJECT_PROPERTIES = "Properties";
         public const string OBJECT_TYPE = "Type";
@@ -155,12 +157,18 @@ namespace SplitAndMerge
         public const string LAST        = "Last";
         public const string LOWER       = "Lower";
         public const string REPLACE     = "Replace";
+        public const string REVERSE     = "Reverse";
+        public const string SORT        = "Sort";
+        public const string SPLIT       = "Split";
         public const string STRING      = "String";
         public const string STARTS_WITH = "StartsWith";
         public const string SUBSTRING   = "Substring";
         public const string TOKENIZE    = "Tokenize";
         public const string TRIM        = "Trim";
         public const string UPPER       = "Upper";
+
+        // Special property for converting an object to a string:
+        public const string PROP_TO_STRING    = "ToString";
 
         public static string END_ARG_STR = END_ARG.ToString();
         public static string NULL_ACTION = END_ARG.ToString();
@@ -193,7 +201,7 @@ namespace SplitAndMerge
         public static List<string> FUNCT_WITH_SPACE = new List<string>
         {
             APPENDLINE, CD, CLASS, CONNECTSRV, COPY, DELETE, DIR, EXISTS, FINDFILES, FINDSTR,
-            FUNCTION, COMPILED_FUNCTION, HELP, MKDIR, MORE, MOVE, NEW, PRINT, READFILE, READFILEBYTES, RUN, SHOW, STARTSRV,
+            FUNCTION, COMPILED_FUNCTION, HELP, MKDIR, MORE, MOVE, NAMESPACE, NEW, PRINT, READFILE, READFILEBYTES, RUN, SHOW, STARTSRV,
             TAIL, THREAD, TRANSLATE, WRITE, WRITELINE, WRITENL
         };
 #else

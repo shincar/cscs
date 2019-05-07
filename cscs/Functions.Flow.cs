@@ -147,6 +147,7 @@ namespace SplitAndMerge
             }
 
             string body = Utils.GetBodyBetween(script, Constants.START_GROUP, Constants.END_GROUP);
+            script.MoveForwardIf(Constants.END_GROUP);
 
             CustomFunction customFunc = new CustomFunction(funcName, body, args, script);
             customFunc.ParentScript = script;
@@ -201,6 +202,12 @@ namespace SplitAndMerge
 
         public static void RegisterClass(string className, CSCSClass obj)
         {
+            obj.Namespace = ParserFunction.GetCurrentNamespace;
+            if (!string.IsNullOrWhiteSpace(obj.Namespace))
+            {
+                className = obj.Namespace + "." + className;
+            }
+
             obj.Name = className;
             className = Constants.ConvertName(className);
             s_allClasses[className] = obj;
@@ -219,6 +226,10 @@ namespace SplitAndMerge
             if (name == m_name)
             {
                 m_constructors[args.Length] = method;
+                for (int i = 0; i < method.DefaultArgsCount && i < args.Length; i++)
+                {
+                    m_constructors[args.Length - i - 1] = method;
+                }
             }
             else
             {
@@ -233,6 +244,16 @@ namespace SplitAndMerge
 
         public static CSCSClass GetClass(string name)
         {
+            string currNamespace = ParserFunction.GetCurrentNamespace;
+            if (!string.IsNullOrWhiteSpace(currNamespace))
+            {
+                bool namespacePresent = name.Contains(".");
+                if (!namespacePresent)
+                {
+                    name = currNamespace + "." + name;
+                }
+            }
+
             CSCSClass theClass = null;
             s_allClasses.TryGetValue(name, out theClass);
             return theClass;
@@ -250,6 +271,8 @@ namespace SplitAndMerge
 
         public ParsingScript ParentScript = null;
         public int ParentOffset = 0;
+
+        public string Namespace { get; private set; }
 
         public class ClassInstance : ScriptObject
         {
@@ -285,7 +308,15 @@ namespace SplitAndMerge
 
             public override string ToString()
             {
-                return m_cscsClass.Name + "." + InstanceName;
+                CustomFunction customFunction = null;
+                if (!m_cscsClass.m_customFunctions.TryGetValue(Constants.PROP_TO_STRING.ToLower(),
+                     out customFunction))
+                {
+                    return m_cscsClass.Name + "." + InstanceName;
+                }
+
+                Variable result = customFunction.Run(null, null, this); 
+                return result.ToString();
             }
 
             public Task<Variable> SetProperty(string name, Variable value)
@@ -353,6 +384,18 @@ namespace SplitAndMerge
                 }
                 return true;
             }
+        }
+    }
+
+    class NameExistsFunction : ParserFunction, INumericFunction
+    {
+        protected override Variable Evaluate(ParsingScript script)
+        {
+            string funcName = Utils.GetToken(script, Constants.TOKEN_SEPARATION);
+            funcName = Constants.ConvertName(funcName);
+
+            ParserFunction function = ParserFunction.GetFunction(funcName, script);
+            return new Variable(function != null);
         }
     }
 
@@ -502,6 +545,8 @@ namespace SplitAndMerge
 
             string scriptExpr = Utils.GetBodyBetween(script, Constants.START_GROUP,
                                                      Constants.END_GROUP);
+            script.MoveForwardIf(Constants.END_GROUP);
+
             Dictionary<int, int> char2Line;
             string body = Utils.ConvertToScript(scriptExpr, out char2Line);
 
@@ -531,6 +576,56 @@ namespace SplitAndMerge
             }
 
             return Variable.EmptyInstance;
+        }
+    }
+
+    public class NamespaceFunction : ParserFunction
+    {
+        protected override Variable Evaluate(ParsingScript script)
+        {
+            string namespaceName = Utils.GetToken(script, Constants.NEXT_OR_END_ARRAY);
+            //Utils.CheckNotEnd(script, m_name);
+            Variable result = null;
+
+            ParserFunction.AddNamespace(namespaceName);
+            try
+            {
+                string scriptExpr = Utils.GetBodyBetween(script, Constants.START_GROUP,
+                                                         Constants.END_GROUP);
+                script.MoveForwardIf(Constants.END_GROUP);
+
+                Dictionary<int, int> char2Line;
+                string body = Utils.ConvertToScript(scriptExpr, out char2Line);
+
+                ParsingScript tempScript = new ParsingScript(body);
+                //tempScript.ScriptOffset = newClass.ParentOffset;
+                tempScript.Char2Line = script.Char2Line;
+                tempScript.Filename = script.Filename;
+                tempScript.OriginalScript = script.OriginalScript;
+                tempScript.ParentScript = script;
+                tempScript.InTryBlock = script.InTryBlock;
+                tempScript.DisableBreakpoints = true;
+                tempScript.MoveForwardIf(Constants.START_GROUP);
+
+                Debugger debugger = script != null && script.Debugger != null ? script.Debugger : Debugger.MainInstance;
+                if (debugger != null)
+                {
+                    result = debugger.StepInFunctionIfNeeded(tempScript).Result;
+                }
+
+                while (tempScript.Pointer < body.Length - 1 &&
+                      (result == null || !result.IsReturn))
+                {
+                    result = tempScript.ExecuteTo();
+                    tempScript.GoToNextStatement();
+                }
+            }
+            finally
+            {
+                ParserFunction.PopNamespace();
+            }
+
+            return result;
         }
     }
 
@@ -570,6 +665,11 @@ namespace SplitAndMerge
         public void RegisterArguments(List<Variable> args,
                                       List<KeyValuePair<string, Variable>> args2 = null)
         {
+            if (args == null)
+            {
+                args = new List<Variable>();
+            }
+
             int missingArgs = m_args.Length - args.Count;
 
             bool namedParameters = false;
@@ -655,6 +755,18 @@ namespace SplitAndMerge
                 stackLevel.Variables[m_args[i]] = arg;
             }
 
+            if (NamespaceData  != null)
+            {
+                var vars = NamespaceData.Variables;
+                string prefix = NamespaceData.Name + ".";
+                foreach (KeyValuePair<string, ParserFunction> elem in vars)
+                {
+                    string key = elem.Key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ?
+                        elem.Key.Substring(prefix.Length) : elem.Key;
+                    stackLevel.Variables[key] = elem.Value;
+                }
+            }
+
             ParserFunction.AddLocalVariables(stackLevel);
         }
 
@@ -695,7 +807,7 @@ namespace SplitAndMerge
             return result;
         }
 
-        public Variable Run(List<Variable> args, ParsingScript script = null,
+        public Variable Run(List<Variable> args = null, ParsingScript script = null,
                             CSCSClass.ClassInstance instance = null)
         {
             List<KeyValuePair<string, Variable>> args2 = instance == null ? null : instance.GetPropList();
@@ -742,7 +854,7 @@ namespace SplitAndMerge
 
             return result;
         }
-        public async Task<Variable> RunAsync(List<Variable> args, ParsingScript script = null,
+        public async Task<Variable> RunAsync(List<Variable> args = null, ParsingScript script = null,
                             CSCSClass.ClassInstance instance = null)
         {
             List<KeyValuePair<string, Variable>> args2 = instance == null ? null : instance.GetPropList();
@@ -852,6 +964,16 @@ namespace SplitAndMerge
 
         public int ArgumentCount { get { return m_args.Length; } }
         public string Argument(int nIndex) { return m_args[nIndex]; }
+
+        public StackLevel NamespaceData { get; set; }
+
+        public int DefaultArgsCount
+        {
+            get
+            {
+                return m_defaultArgs.Count;
+            }
+        }
 
         public string Header
         {
@@ -1518,6 +1640,7 @@ namespace SplitAndMerge
             Variable result = ProcessObject(script, varValue);
             if (result != null)
             {
+                ParserFunction.AddGlobalOrLocalVariable(m_name, new GetVarFunction(result));
                 return result;
             }
 
@@ -1561,6 +1684,7 @@ namespace SplitAndMerge
             Variable result = await ProcessObjectAsync(script, varValue);
             if (result != null)
             {
+                ParserFunction.AddGlobalOrLocalVariable(m_name, new GetVarFunction(result)); 
                 return result;
             }
 
@@ -1621,6 +1745,11 @@ namespace SplitAndMerge
             string name = varName.Substring(0, ind);
             string prop = varName.Substring(ind + 1);
 
+            if (ParserFunction.TryAddToNamespace(prop, name, varValue))
+            {
+                return varValue.DeepClone();
+            }
+
             ParserFunction existing = ParserFunction.GetFunction(name, script);
             Variable baseValue = existing != null ? existing.GetValue(script) : new Variable(Variable.VarType.ARRAY);
             baseValue.SetProperty(prop, varValue, name);
@@ -1655,6 +1784,11 @@ namespace SplitAndMerge
 
             string name = varName.Substring(0, ind);
             string prop = varName.Substring(ind + 1);
+
+            if (ParserFunction.TryAddToNamespace(prop, name, varValue))
+            {
+                return varValue.DeepClone();
+            }
 
             ParserFunction existing = ParserFunction.GetFunction(name, script);
             Variable baseValue = existing != null ? await existing.GetValueAsync(script) : new Variable(Variable.VarType.ARRAY);

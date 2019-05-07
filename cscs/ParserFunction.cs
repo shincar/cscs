@@ -131,7 +131,13 @@ namespace SplitAndMerge
             string baseName = name.Substring(0, ind);
             string prop     = name.Substring(ind + 1);
 
-            ParserFunction pf = ParserFunction.GetFunction(baseName, script);
+            ParserFunction pf = ParserFunction.GetFunctionNamespace(prop, baseName, script);
+            if (pf != null)
+            {
+                return pf;
+            }
+
+            pf = ParserFunction.GetFunction(baseName, script);
             GetVarFunction varFunc = pf as GetVarFunction;
             if (varFunc == null)
             {
@@ -158,6 +164,63 @@ namespace SplitAndMerge
 
             action = null;
             return theAction;
+        }
+
+        public static bool TryAddToNamespace(string name, string nameSpace, Variable varValue)
+        {
+            StackLevel level;
+            if (string.IsNullOrWhiteSpace(nameSpace) ||
+               !s_namespaces.TryGetValue(nameSpace, out level))
+            {
+                return false;
+            }
+
+            var vars = level.Variables;
+            vars[name] = new GetVarFunction(varValue);
+
+            return true;
+        }
+
+        public static ParserFunction GetFunctionNamespace(string name, ParsingScript script)
+        {
+            ParserFunction result = GetFunctionNamespace(name, s_namespace, script);
+            return result;
+        }
+
+        public static ParserFunction GetFunctionNamespace(string name, string nameSpace, ParsingScript script)
+        {
+            if (string.IsNullOrWhiteSpace(nameSpace))
+            {
+                return null;
+            }
+
+            StackLevel level;
+            if  (!s_namespaces.TryGetValue(nameSpace, out level))
+            {
+                return null;
+            }
+
+            var vars = level.Variables;
+            ParserFunction impl;
+            if (vars.TryGetValue(name, out impl))
+            {
+                return impl;
+            }
+
+            if (!name.StartsWith(nameSpace, StringComparison.OrdinalIgnoreCase))
+            {
+                name = nameSpace + "." + name;
+                if (vars.TryGetValue(name, out impl))
+                {
+                    return impl;
+                }
+                if (s_functions.TryGetValue(name, out impl))
+                {
+                    return impl;
+                }
+            }
+
+            return null;
         }
 
         public static ParserFunction GetFunction(string name, ParsingScript script)
@@ -189,7 +252,7 @@ namespace SplitAndMerge
                 return impl.NewInstance();
             }
 
-            return null;
+            return GetFunctionNamespace(name, script);
         }
 
         public static void UpdateFunction(Variable variable)
@@ -240,6 +303,13 @@ namespace SplitAndMerge
         public static void AddGlobalOrLocalVariable(string name, GetVarFunction function)
         {
             name          = Constants.ConvertName(name);
+
+            Dictionary<string, ParserFunction> lastLevel = GetLastLevel();
+            if (lastLevel != null && s_locals.Peek().IsNamespace && !string.IsNullOrWhiteSpace(s_namespace))
+            {
+                name = s_namespacePrefix + name;
+            }
+
             function.Name = Constants.GetRealName(name);
             if (s_locals.Count > StackLevelDelta && (LocalNameExists(name) || !GlobalNameExists(name)))
             {
@@ -299,7 +369,10 @@ namespace SplitAndMerge
                         {
                             var val = gvf.Value.GetProperty(var.AsString());
                             varData = CreateVariableEntry(val, variable.Name + "." + var.AsString(), isLocal);
-                            sb.AppendLine(varData);
+                            if (!string.IsNullOrWhiteSpace(varData))
+                            {
+                                sb.AppendLine(varData);
+                            }
                         }
                     }
                 }
@@ -333,16 +406,27 @@ namespace SplitAndMerge
             return sb.ToString().Trim();
         }
 
-        static bool LocalNameExists(string name)
+        static Dictionary<string, ParserFunction> GetLastLevel()
         {
             if (s_locals.Count <= StackLevelDelta)
+            {
+                return null;
+            }
+            var result = s_locals.Peek().Variables;
+            return result;
+        }
+
+        static bool LocalNameExists(string name)
+        {
+            Dictionary<string, ParserFunction> lastLevel = GetLastLevel();
+            if (lastLevel == null)
             {
                 return false;
             }
             name = Constants.ConvertName(name);
-            var vars = s_locals.Peek().Variables;
-            return vars.ContainsKey(name);
+            return lastLevel.ContainsKey(name);
         }
+
         static bool GlobalNameExists(string name)
         {
             name = Constants.ConvertName(name);
@@ -364,6 +448,17 @@ namespace SplitAndMerge
         public static void RegisterFunction(string name, ParserFunction function,
                                             bool isNative = true)
         {
+            if (!string.IsNullOrWhiteSpace(s_namespace))
+            {
+                StackLevel level;
+                if (s_namespaces.TryGetValue(s_namespace, out level) &&
+                   function is CustomFunction)
+                {
+                    ((CustomFunction)function).NamespaceData = level;
+                    name = s_namespacePrefix + name;
+                }
+            }
+
             AddGlobal(name, function, isNative);
         }
 
@@ -442,6 +537,45 @@ namespace SplitAndMerge
         public static void AddLocalVariables(StackLevel locals)
         {
             s_locals.Push(locals);
+        }
+
+        public static void AddNamespace(string namespaceName)
+        {
+            if (!string.IsNullOrWhiteSpace(s_namespace))
+            {
+                throw new ArgumentException("Already inside of namespace [" + s_namespace + "].");
+            }
+
+            StackLevel level;
+            if (!s_namespaces.TryGetValue(namespaceName, out level))
+            {
+                level = new StackLevel(namespaceName, true); ;
+            }
+
+            s_locals.Push(level);
+            s_namespaces[namespaceName] = level;
+
+            s_namespace = namespaceName;
+            s_namespacePrefix = namespaceName + ".";
+        }
+
+        public static void PopNamespace()
+        {
+            s_namespace = s_namespacePrefix = "";
+            while (s_locals.Count > 0)
+            {
+                var level = s_locals.Pop();
+                if (level.IsNamespace)
+                {
+                    return;
+                }
+            }
+        }
+
+        public static string AdjustWithNamespace(string name)
+        {
+            name = Constants.ConvertName(name);
+            return s_namespacePrefix + name;
         }
 
         public static void AddStackLevel(string scopeName)
@@ -573,12 +707,15 @@ namespace SplitAndMerge
 
         public class StackLevel
         {
-            public StackLevel(string name = null)
+            public StackLevel(string name = null, bool isNamespace = false)
             {
                 Name = name;
+                IsNamespace = isNamespace;
                 Variables = new Dictionary<string, ParserFunction>();
             }
             public string Name { get; set; }
+            public bool IsNamespace { get; set; }
+
             public Dictionary<string, ParserFunction> Variables { get; set; }
         }
 
@@ -586,6 +723,12 @@ namespace SplitAndMerge
         // Stack of the functions being executed:
         static Stack<StackLevel> s_locals = new Stack<StackLevel>();
         public static Stack<StackLevel> ExecutionStack { get { return s_locals; } }
+
+        static Dictionary<string, StackLevel> s_namespaces = new Dictionary<string, StackLevel>();
+        static string s_namespace;
+        static string s_namespacePrefix;
+
+        public static string GetCurrentNamespace { get { return s_namespace; } }
 
         static StringOrNumberFunction s_strOrNumFunction =
           new StringOrNumberFunction();

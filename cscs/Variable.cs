@@ -716,7 +716,8 @@ namespace SplitAndMerge
                     {
                         args = new List<Variable>();
                     }
-                    result = obj.GetProperty(match, args, script).Result;
+                    var task = obj.GetProperty(match, args, script);
+                    result   = task != null ? task.Result : null;
                     if (result != null)
                     {
                         return result;
@@ -840,7 +841,30 @@ namespace SplitAndMerge
 
                 return new Variable(AsString().Substring(startFrom, length));
             }
-            else if (script != null && propName.Equals(Constants.TOKENIZE, StringComparison.OrdinalIgnoreCase))
+            else if (script != null && propName.Equals(Constants.REVERSE, StringComparison.OrdinalIgnoreCase))
+            {
+                script.GetFunctionArgs();
+                if (Tuple != null)
+                {
+                    Tuple.Reverse();
+                }
+                else if (Type == VarType.STRING)
+                {
+                    char[] charArray = AsString().ToCharArray();
+                    Array.Reverse(charArray);
+                    String = new string(charArray);
+                }
+
+                return this;
+            }
+            else if (script != null && propName.Equals(Constants.SORT, StringComparison.OrdinalIgnoreCase))
+            {
+                script.GetFunctionArgs();
+                Sort();
+
+                return this;
+            }
+            else if (script != null && propName.Equals(Constants.SPLIT, StringComparison.OrdinalIgnoreCase))
             {
                 List<Variable> args = script.GetFunctionArgs();
                 string sep = Utils.GetSafeString(args, 0, " ");
@@ -859,6 +883,25 @@ namespace SplitAndMerge
 
                 var join = string.Join(sep, Tuple);
                 return new Variable(join);
+            }
+            else if (script != null && propName.Equals(Constants.ADD, StringComparison.OrdinalIgnoreCase))
+            {
+                List<Variable> args = script.GetFunctionArgs();
+                Utils.CheckArgs(args.Count, 1, propName);
+                Variable var = Utils.GetSafeVariable(args, 0);
+                if (Tuple != null)
+                {
+                    Tuple.Add(var);
+                }
+                else if (Type == VarType.NUMBER)
+                {
+                    Value += var.AsDouble();
+                }
+                else
+                {
+                    String += var.AsString();
+                }
+                return var;
             }
             else if (script != null && propName.Equals(Constants.AT, StringComparison.OrdinalIgnoreCase))
             {
@@ -891,8 +934,13 @@ namespace SplitAndMerge
                 StringComparison comp = param.Equals("case", StringComparison.OrdinalIgnoreCase) ?
                     StringComparison.CurrentCulture : StringComparison.CurrentCultureIgnoreCase;
 
-                int index = AsString().IndexOf(val, comp);
-                return new Variable(index >= 0);
+                bool contains = val != "" && AsString().IndexOf(val, comp) >= 0;
+                if (!contains && (Type == Variable.VarType.ARRAY && m_dictionary != null))
+                {
+                    string lower = val.ToLower();
+                    contains = m_dictionary.ContainsKey(lower);
+                }
+                return new Variable(contains);
             }
             else if (script != null && propName.Equals(Constants.EQUALS, StringComparison.OrdinalIgnoreCase))
             {
@@ -1041,6 +1089,46 @@ namespace SplitAndMerge
                 }
             }
             return match;
+        }
+
+        public void Sort()
+        {
+            if (Tuple == null || Tuple.Count <= 1)
+            {
+                return;
+            }
+
+            List<double> numbers = new List<double>();
+            List<string> strings = new List<string>();
+            for (int i = 0; i < Tuple.Count; i++)
+            {
+                Variable arg = Tuple[i];
+                if (arg.Tuple != null)
+                {
+                    arg.Sort();
+                }
+                else if (arg.Type == VarType.NUMBER)
+                {
+                    numbers.Add(arg.AsDouble());
+                }
+                else
+                {
+                    strings.Add(arg.AsString());
+                }
+            }
+            List<Variable> newTuple = new List<Variable>(Tuple.Count);
+            numbers.Sort();
+            strings.Sort();
+
+            for (int i = 0; i < numbers.Count; i++)
+            {
+                newTuple.Add(new Variable(numbers[i]));
+            }
+            for (int i = 0; i < strings.Count; i++)
+            {
+                newTuple.Add(new Variable(strings[i]));
+            }
+            Tuple = newTuple;
         }
 
         public double Value
